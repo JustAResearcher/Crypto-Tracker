@@ -1,7 +1,9 @@
 package com.cryptotracker.repository
 
+import com.cryptotracker.data.local.CoinOrderEntity
 import com.cryptotracker.data.local.CryptoDatabase
 import com.cryptotracker.data.local.FavoriteEntity
+import com.cryptotracker.data.local.PortfolioEntity
 import com.cryptotracker.data.local.PriceAlertEntity
 import com.cryptotracker.data.remote.CoinGeckoApi
 import com.cryptotracker.data.remote.dto.CoinMarketDto
@@ -63,4 +65,21 @@ class CryptoRepository @Inject constructor(
 
     suspend fun markAlertTriggered(alertId: Int) =
         db.priceAlertDao().markTriggered(alertId)
+
+    // Coin order
+    fun getCoinOrder(): Flow<List<CoinOrderEntity>> =
+        db.coinOrderDao().getAll()
+
+    suspend fun saveCoinOrder(orders: List<CoinOrderEntity>) =
+        db.coinOrderDao().replaceAll(orders)
+
+    // Portfolio
+    fun getPortfolioEntries(): Flow<List<PortfolioEntity>> =
+        db.portfolioDao().getAll()
+
+    suspend fun addPortfolioEntry(entry: PortfolioEntity) =
+        db.portfolioDao().insert(entry)
+
+    suspend fun deletePortfolioEntry(id: Int) =
+        db.portfolioDao().delete(id)
 }

@@ -3,6 +3,7 @@ package com.cryptotracker.ui.navigation
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
@@ -25,18 +26,20 @@ import androidx.navigation.navArgument
 import com.cryptotracker.ui.detail.DetailScreen
 import com.cryptotracker.ui.favorites.FavoritesScreen
 import com.cryptotracker.ui.home.HomeScreen
+import com.cryptotracker.ui.portfolio.PortfolioScreen
 import com.cryptotracker.ui.search.SearchScreen
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector?) {
     data object Home : Screen("home", "Home", Icons.Default.Home)
     data object Search : Screen("search", "Search", Icons.Default.Search)
     data object Favorites : Screen("favorites", "Favorites", Icons.Default.Star)
+    data object Portfolio : Screen("portfolio", "Portfolio", Icons.Default.PieChart)
     data object Detail : Screen("detail/{coinId}", "Detail", null) {
         fun createRoute(coinId: String) = "detail/$coinId"
     }
 }
 
-private val bottomNavItems = listOf(Screen.Home, Screen.Search, Screen.Favorites)
+private val bottomNavItems = listOf(Screen.Home, Screen.Search, Screen.Favorites, Screen.Portfolio)
 
 @Composable
 fun AppNavGraph() {
@@ -101,6 +104,10 @@ fun AppNavGraph() {
                         navController.navigate(Screen.Detail.createRoute(coinId))
                     }
                 )
+            }
+
+            composable(Screen.Portfolio.route) {
+                PortfolioScreen()
             }
 
             composable(
