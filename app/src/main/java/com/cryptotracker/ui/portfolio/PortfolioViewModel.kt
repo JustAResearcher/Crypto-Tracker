@@ -49,9 +49,29 @@ class PortfolioViewModel @Inject constructor(
     private val _editingHolding = MutableStateFlow<PortfolioHolding?>(null)
 
     // Coin search for add-holding dialog
-    private var cachedMarkets: List<CoinMarketDto> = emptyList()
+    private var cachedMarkets: List<CoinMarketDto> = listOf(MEOWCOIN_FALLBACK)
     private val _coinSearchResults = MutableStateFlow<List<CoinMarketDto>>(emptyList())
     val coinSearchResults: StateFlow<List<CoinMarketDto>> = _coinSearchResults
+
+    companion object {
+        // Hardcoded fallback so Meowcoin is always searchable even if API fails
+        private val MEOWCOIN_FALLBACK = CoinMarketDto(
+            id = "meowcoin",
+            symbol = "mewc",
+            name = "Meowcoin",
+            image = "https://assets.coingecko.com/coins/images/26256/large/mewc.png",
+            currentPrice = null,
+            marketCap = null,
+            marketCapRank = null,
+            totalVolume = null,
+            high24h = null,
+            low24h = null,
+            priceChangePercentage24h = null,
+            circulatingSupply = null,
+            ath = null,
+            sparklineIn7d = null
+        )
+    }
 
     val uiState: StateFlow<PortfolioUiState> = combine(
         _entries, _prices, _isLoading, _error, _showAddDialog, _editingHolding
@@ -110,11 +130,14 @@ class PortfolioViewModel @Inject constructor(
             try {
                 val markets = repository.getMarkets()
                 val hasMewc = markets.any { it.id == "meowcoin" }
-                cachedMarkets = if (hasMewc) markets else {
+                val withMewc = if (hasMewc) markets else {
                     val mewc = try { repository.getCoinsByIds(listOf("meowcoin")) } catch (_: Exception) { emptyList() }
-                    markets + mewc
+                    if (mewc.isNotEmpty()) markets + mewc else markets + MEOWCOIN_FALLBACK
                 }
-            } catch (_: Exception) { }
+                cachedMarkets = withMewc
+            } catch (_: Exception) {
+                // Keep the fallback list with Meowcoin
+            }
         }
     }
 
