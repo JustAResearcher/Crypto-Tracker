@@ -90,15 +90,9 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun onReorder(fromIndex: Int, toIndex: Int) {
-        val current = uiState.value.coins.toMutableList()
-        if (fromIndex !in current.indices || toIndex !in current.indices) return
-        val item = current.removeAt(fromIndex)
-        current.add(toIndex, item)
-
-        // Persist entire visible order
-        val orders = current.mapIndexed { index, coin ->
-            CoinOrderEntity(coinId = coin.id, position = index)
+    fun commitOrder(coinIds: List<String>) {
+        val orders = coinIds.mapIndexed { index, id ->
+            CoinOrderEntity(coinId = id, position = index)
         }
         viewModelScope.launch {
             repository.saveCoinOrder(orders)

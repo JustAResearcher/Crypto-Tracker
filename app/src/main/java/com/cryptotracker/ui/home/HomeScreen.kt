@@ -1,6 +1,5 @@
 package com.cryptotracker.ui.home
 
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListItemInfo
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
@@ -30,10 +28,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -44,11 +43,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.cryptotracker.domain.model.Coin
 import com.cryptotracker.ui.components.CoinListItem
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.isActive
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
     onCoinClick: (String) -> Unit,
@@ -56,52 +56,54 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
 
-    // Drag state — kept at the list level so it survives item recomposition
-    var draggedIndex by remember { mutableIntStateOf(-1) }
+    // Local mutable list that drives the UI during drag — no ViewModel round-trips
+    val localCoins = remember { mutableStateListOf<Coin>() }
+    var isDragging by remember { mutableStateOf(false) }
     var currentIndex by remember { mutableIntStateOf(-1) }
     var dragDelta by remember { mutableFloatStateOf(0f) }
-    var isDragging by remember { mutableStateOf(false) }
-    // Accumulated auto-scroll offset so the item tracks the finger
-    var autoScrollAccum by remember { mutableFloatStateOf(0f) }
+    var overscroll by remember { mutableFloatStateOf(0f) }
 
-    // Auto-scroll when dragging near top/bottom edges
-    LaunchedEffect(isDragging, dragDelta) {
+    // Sync from ViewModel when NOT dragging
+    LaunchedEffect(uiState.coins, isDragging) {
+        if (!isDragging) {
+            localCoins.clear()
+            localCoins.addAll(uiState.coins)
+        }
+    }
+
+    // Continuous auto-scroll while dragging near edges
+    LaunchedEffect(isDragging) {
         if (!isDragging) return@LaunchedEffect
-        val viewportHeight = listState.layoutInfo.viewportEndOffset -
-                listState.layoutInfo.viewportStartOffset
-        val threshold = viewportHeight * 0.15f
+        while (isActive && isDragging) {
+            val viewport = listState.layoutInfo
+            val viewportHeight = (viewport.viewportEndOffset - viewport.viewportStartOffset).toFloat()
+            if (viewportHeight <= 0f) { delay(16); continue }
 
-        // Find the dragged item's current visual center
-        val draggedInfo = listState.layoutInfo.visibleItemsInfo
-            .firstOrNull { it.index == currentIndex }
-        if (draggedInfo != null) {
-            val itemCenter = draggedInfo.offset + dragDelta + draggedInfo.size / 2f
-            val scrollAmount = when {
-                itemCenter < listState.layoutInfo.viewportStartOffset + threshold -> -8
-                itemCenter > listState.layoutInfo.viewportEndOffset - threshold -> 8
-                else -> 0
-            }
-            if (scrollAmount != 0) {
-                while (isDragging) {
-                    listState.dispatchRawDelta(scrollAmount.toFloat())
-                    autoScrollAccum += scrollAmount
-                    delay(8)
+            val draggedInfo = viewport.visibleItemsInfo.firstOrNull { it.index == currentIndex }
+            if (draggedInfo != null) {
+                val itemCenter = draggedInfo.offset + dragDelta + draggedInfo.size / 2f
+                val topEdge = viewport.viewportStartOffset + viewportHeight * 0.12f
+                val bottomEdge = viewport.viewportEndOffset - viewportHeight * 0.12f
+
+                val speed = when {
+                    itemCenter < topEdge -> -(topEdge - itemCenter).coerceAtMost(20f)
+                    itemCenter > bottomEdge -> (itemCenter - bottomEdge).coerceAtMost(20f)
+                    else -> 0f
+                }
+                if (speed != 0f) {
+                    val consumed = listState.dispatchRawDelta(speed)
+                    overscroll += consumed
                 }
             }
+            delay(16) // ~60fps
         }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        "Crypto Tracker",
-                        fontWeight = FontWeight.Bold
-                    )
-                },
+                title = { Text("Crypto Tracker", fontWeight = FontWeight.Bold) },
                 actions = {
                     IconButton(onClick = { viewModel.loadMarkets() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh")
@@ -118,27 +120,22 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            if (uiState.isLoading && uiState.coins.isEmpty()) {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center)
-                )
+            if (uiState.isLoading && localCoins.isEmpty()) {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             }
 
             uiState.error?.let { error ->
-                if (uiState.coins.isEmpty()) {
+                if (localCoins.isEmpty()) {
                     Column(
                         modifier = Modifier
                             .align(Alignment.Center)
                             .padding(32.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(
-                            text = "Something went wrong",
-                            style = MaterialTheme.typography.titleMedium
-                        )
+                        Text("Something went wrong", style = MaterialTheme.typography.titleMedium)
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = error,
+                            error,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -150,64 +147,60 @@ fun HomeScreen(
                 state = listState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(uiState.coins) {
+                    .pointerInput(Unit) {
                         detectDragGesturesAfterLongPress(
                             onDragStart = { offset ->
-                                // Find which item was long-pressed
                                 listState.layoutInfo.visibleItemsInfo
                                     .firstOrNull { info ->
                                         offset.y.toInt() in info.offset..(info.offset + info.size)
                                     }
                                     ?.let { info ->
-                                        draggedIndex = info.index
                                         currentIndex = info.index
                                         dragDelta = 0f
-                                        autoScrollAccum = 0f
+                                        overscroll = 0f
                                         isDragging = true
                                     }
                             },
-                            onDrag = { change, dragAmount ->
+                            onDrag = { change, amount ->
                                 change.consume()
-                                dragDelta += dragAmount.y
+                                dragDelta += amount.y
 
-                                // Check for swap with neighbors using overlap
+                                // Check overlap with neighbors for swap
                                 val items = listState.layoutInfo.visibleItemsInfo
                                 val draggedInfo = items.firstOrNull { it.index == currentIndex }
                                     ?: return@detectDragGesturesAfterLongPress
-
                                 val draggedCenter =
                                     draggedInfo.offset + dragDelta + draggedInfo.size / 2f
 
-                                // Find the item whose bounds contain the dragged center
-                                val targetInfo = items.firstOrNull { info ->
+                                val target = items.firstOrNull { info ->
                                     info.index != currentIndex &&
                                             draggedCenter >= info.offset &&
                                             draggedCenter <= info.offset + info.size
                                 }
-
-                                if (targetInfo != null) {
+                                if (target != null) {
                                     val from = currentIndex
-                                    val to = targetInfo.index
-                                    viewModel.onReorder(from, to)
-
-                                    // Adjust delta so the item stays under the finger
-                                    dragDelta += (draggedInfo.offset - targetInfo.offset).toFloat()
+                                    val to = target.index
+                                    // Swap in the LOCAL list only — zero I/O
+                                    val item = localCoins.removeAt(from)
+                                    localCoins.add(to, item)
+                                    // Adjust so the item stays under the finger
+                                    dragDelta += (draggedInfo.offset - target.offset)
                                     currentIndex = to
                                 }
                             },
                             onDragEnd = {
+                                // Persist final order once on drop
+                                viewModel.commitOrder(localCoins.map { it.id })
                                 isDragging = false
-                                draggedIndex = -1
                                 currentIndex = -1
                                 dragDelta = 0f
-                                autoScrollAccum = 0f
+                                overscroll = 0f
                             },
                             onDragCancel = {
                                 isDragging = false
-                                draggedIndex = -1
                                 currentIndex = -1
                                 dragDelta = 0f
-                                autoScrollAccum = 0f
+                                overscroll = 0f
                             }
                         )
                     },
@@ -215,24 +208,27 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 itemsIndexed(
-                    items = uiState.coins,
+                    items = localCoins,
                     key = { _, coin -> coin.id }
                 ) { index, coin ->
                     val isBeingDragged = currentIndex == index && isDragging
-                    val elevation by animateDpAsState(
-                        targetValue = if (isBeingDragged) 8.dp else 0.dp,
-                        label = "dragElevation"
-                    )
 
                     Box(
                         modifier = Modifier
                             .zIndex(if (isBeingDragged) 1f else 0f)
                             .graphicsLayer {
                                 translationY = if (isBeingDragged) dragDelta else 0f
-                                scaleX = if (isBeingDragged) 1.02f else 1f
-                                scaleY = if (isBeingDragged) 1.02f else 1f
+                                scaleX = if (isBeingDragged) 1.03f else 1f
+                                scaleY = if (isBeingDragged) 1.03f else 1f
+                                shadowElevation = if (isBeingDragged) 12f else 0f
+                                alpha = if (isBeingDragged) 0.92f else 1f
                             }
-                            .shadow(elevation, shape = MaterialTheme.shapes.medium)
+                            .then(
+                                if (isBeingDragged)
+                                    Modifier.shadow(8.dp, MaterialTheme.shapes.medium)
+                                else Modifier
+                            )
+                            .animateItemPlacement()
                     ) {
                         CoinListItem(
                             coin = coin,
@@ -245,7 +241,7 @@ fun HomeScreen(
                 }
             }
 
-            if (uiState.isLoading && uiState.coins.isNotEmpty()) {
+            if (uiState.isLoading && localCoins.isNotEmpty()) {
                 CircularProgressIndicator(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
