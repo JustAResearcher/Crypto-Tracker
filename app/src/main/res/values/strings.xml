@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Crypto Tracker</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_search">Search</string>
+    <string name="nav_favorites">Favorites</string>
+    <string name="search_hint">Search coins…</string>
+    <string name="no_favorites">No favorites yet. Star a coin to add it here.</string>
+    <string name="price_alert_channel">Price Alerts</string>
+    <string name="price_alert_channel_desc">Notifications when a coin hits your target price</string>
+    <string name="set_alert">Set Alert</string>
+    <string name="remove_alert">Remove Alert</string>
+    <string name="target_price_hint">Target price (USD)</string>
+    <string name="chart_7d">7D</string>
+    <string name="chart_30d">30D</string>
+    <string name="chart_1y">1Y</string>
+    <string name="market_cap">Market Cap</string>
+    <string name="volume_24h">24h Volume</string>
+    <string name="high_24h">24h High</string>
+    <string name="low_24h">24h Low</string>
+    <string name="ath">All-Time High</string>
+    <string name="circulating_supply">Circulating Supply</string>
+    <string name="alert_notification_title">Price Alert</string>
+</resources>
