@@ -78,7 +78,10 @@ fun PortfolioScreen(
     }
 
     if (uiState.showAddDialog) {
+        val searchResults by viewModel.coinSearchResults.collectAsStateWithLifecycle()
         AddHoldingDialog(
+            searchResults = searchResults,
+            onSearch = { viewModel.searchCoins(it) },
             onDismiss = { viewModel.hideAddDialog() },
             onConfirm = { coinId, coinName, qty ->
                 viewModel.addHolding(coinId, coinName, qty)
@@ -278,11 +281,14 @@ private fun HoldingItem(
 
 @Composable
 private fun AddHoldingDialog(
+    searchResults: List<com.cryptotracker.data.remote.dto.CoinMarketDto>,
+    onSearch: (String) -> Unit,
     onDismiss: () -> Unit,
     onConfirm: (coinId: String, coinName: String, quantity: Double) -> Unit
 ) {
-    var coinId by remember { mutableStateOf("") }
-    var coinName by remember { mutableStateOf("") }
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedId by remember { mutableStateOf("") }
+    var selectedName by remember { mutableStateOf("") }
     var quantity by remember { mutableStateOf("") }
 
     AlertDialog(
@@ -290,38 +296,102 @@ private fun AddHoldingDialog(
         title = { Text("Add Holding") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = coinId,
-                    onValueChange = { coinId = it.lowercase().trim() },
-                    label = { Text("Coin ID (e.g. bitcoin)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = coinName,
-                    onValueChange = { coinName = it },
-                    label = { Text("Coin name (e.g. Bitcoin)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = quantity,
-                    onValueChange = { quantity = it },
-                    label = { Text("Quantity") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                if (selectedId.isBlank()) {
+                    // Step 1: Search for a coin
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = {
+                            searchQuery = it
+                            onSearch(it)
+                        },
+                        label = { Text("Search by name or ticker") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (searchResults.isNotEmpty()) {
+                        Column(
+                            modifier = Modifier.height(200.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            androidx.compose.foundation.lazy.LazyColumn {
+                                items(
+                                    count = searchResults.size,
+                                    key = { searchResults[it].id }
+                                ) { idx ->
+                                    val coin = searchResults[idx]
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                selectedId = coin.id
+                                                selectedName = coin.name
+                                            }
+                                            .padding(vertical = 8.dp, horizontal = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        AsyncImage(
+                                            model = coin.image,
+                                            contentDescription = null,
+                                            modifier = Modifier
+                                                .size(24.dp)
+                                                .clip(CircleShape)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            coin.name,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Text(
+                                            coin.symbol.uppercase(),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Step 2: Coin selected, enter quantity
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            "$selectedName (${selectedId})",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(onClick = {
+                            selectedId = ""
+                            selectedName = ""
+                            searchQuery = ""
+                            onSearch("")
+                        }) { Text("Change") }
+                    }
+                    OutlinedTextField(
+                        value = quantity,
+                        onValueChange = { quantity = it },
+                        label = { Text("Quantity") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
                     val qty = quantity.toDoubleOrNull()
-                    if (coinId.isNotBlank() && coinName.isNotBlank() && qty != null && qty > 0) {
-                        onConfirm(coinId, coinName, qty)
+                    if (selectedId.isNotBlank() && selectedName.isNotBlank() && qty != null && qty > 0) {
+                        onConfirm(selectedId, selectedName, qty)
                     }
-                }
+                },
+                enabled = selectedId.isNotBlank() && quantity.toDoubleOrNull() != null
             ) { Text("Add") }
         },
         dismissButton = {

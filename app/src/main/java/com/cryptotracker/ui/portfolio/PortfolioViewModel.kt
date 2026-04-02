@@ -48,6 +48,11 @@ class PortfolioViewModel @Inject constructor(
     private val _showAddDialog = MutableStateFlow(false)
     private val _editingHolding = MutableStateFlow<PortfolioHolding?>(null)
 
+    // Coin search for add-holding dialog
+    private var cachedMarkets: List<CoinMarketDto> = emptyList()
+    private val _coinSearchResults = MutableStateFlow<List<CoinMarketDto>>(emptyList())
+    val coinSearchResults: StateFlow<List<CoinMarketDto>> = _coinSearchResults
+
     val uiState: StateFlow<PortfolioUiState> = combine(
         _entries, _prices, _isLoading, _error, _showAddDialog, _editingHolding
     ) { values ->
@@ -100,6 +105,17 @@ class PortfolioViewModel @Inject constructor(
                 }
             }
         }
+        // Pre-load markets for coin search in add dialog
+        viewModelScope.launch {
+            try {
+                val markets = repository.getMarkets()
+                val hasMewc = markets.any { it.id == "meowcoin" }
+                cachedMarkets = if (hasMewc) markets else {
+                    val mewc = try { repository.getCoinsByIds(listOf("meowcoin")) } catch (_: Exception) { emptyList() }
+                    markets + mewc
+                }
+            } catch (_: Exception) { }
+        }
     }
 
     private fun refreshPrices(ids: List<String>) {
@@ -120,8 +136,27 @@ class PortfolioViewModel @Inject constructor(
         if (ids.isNotEmpty()) refreshPrices(ids)
     }
 
-    fun showAddDialog() { _showAddDialog.value = true }
-    fun hideAddDialog() { _showAddDialog.value = false }
+    fun showAddDialog() {
+        _showAddDialog.value = true
+        _coinSearchResults.value = emptyList()
+    }
+    fun hideAddDialog() {
+        _showAddDialog.value = false
+        _coinSearchResults.value = emptyList()
+    }
+
+    fun searchCoins(query: String) {
+        if (query.isBlank()) {
+            _coinSearchResults.value = emptyList()
+            return
+        }
+        val q = query.trim().lowercase()
+        _coinSearchResults.value = cachedMarkets.filter { dto ->
+            dto.name.lowercase().contains(q) ||
+            dto.symbol.lowercase().contains(q) ||
+            dto.id.lowercase().contains(q)
+        }.take(10)
+    }
 
     fun editHolding(holding: PortfolioHolding) { _editingHolding.value = holding }
     fun cancelEdit() { _editingHolding.value = null }
