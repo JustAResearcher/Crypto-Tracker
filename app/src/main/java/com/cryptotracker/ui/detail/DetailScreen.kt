@@ -30,7 +30,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -238,18 +238,18 @@ fun DetailScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         StatRow("Market Cap", compactFormat.format(coin.marketCap))
-                        Divider(modifier = Modifier.padding(vertical = 8.dp))
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                         StatRow("24h Volume", compactFormat.format(coin.totalVolume))
-                        Divider(modifier = Modifier.padding(vertical = 8.dp))
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                         currencyFormat.maximumFractionDigits = if (coin.high24h < 1.0) 6 else 2
                         StatRow("24h High", currencyFormat.format(coin.high24h))
-                        Divider(modifier = Modifier.padding(vertical = 8.dp))
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                         currencyFormat.maximumFractionDigits = if (coin.low24h < 1.0) 6 else 2
                         StatRow("24h Low", currencyFormat.format(coin.low24h))
-                        Divider(modifier = Modifier.padding(vertical = 8.dp))
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                         currencyFormat.maximumFractionDigits = if (coin.ath < 1.0) 6 else 2
                         StatRow("All-Time High", currencyFormat.format(coin.ath))
-                        Divider(modifier = Modifier.padding(vertical = 8.dp))
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                         StatRow("Circulating Supply", NumberFormat.getNumberInstance().format(coin.circulatingSupply) + " ${coin.symbol.uppercase()}")
                     }
                 }
