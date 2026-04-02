@@ -45,10 +45,19 @@ class SearchViewModel @Inject constructor(
     private var searchJob: Job? = null
 
     init {
-        // Pre-load market data for instant local search
+        // Pre-load market data (including pinned coins) for instant local search
         viewModelScope.launch {
             try {
-                cachedMarkets = repository.getMarkets()
+                val markets = repository.getMarkets()
+                val hasMewc = markets.any { it.id == "meowcoin" }
+                cachedMarkets = if (hasMewc) {
+                    markets
+                } else {
+                    val mewc = try {
+                        repository.getCoinsByIds(listOf("meowcoin"))
+                    } catch (_: Exception) { emptyList() }
+                    markets + mewc
+                }
             } catch (_: Exception) { }
         }
     }
