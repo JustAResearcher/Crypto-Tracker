@@ -56,8 +56,10 @@ class HomeViewModel @Inject constructor(
             val (ordered, unordered) = mapped.partition { posMap.containsKey(it.id) }
             ordered.sortedBy { posMap[it.id] ?: Int.MAX_VALUE } + unordered
         }
-
-        HomeUiState(coins = sorted, isLoading = loading, error = error)
+        // Always pin MEWC at the top
+        val mewc = sorted.filter { it.id == PINNED_COIN_ID }
+        val rest = sorted.filter { it.id != PINNED_COIN_ID }
+        HomeUiState(coins = mewc + rest, isLoading = loading, error = error)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeUiState())
 
     init {
