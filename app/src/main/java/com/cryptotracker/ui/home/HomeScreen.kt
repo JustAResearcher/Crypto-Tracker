@@ -83,16 +83,23 @@ fun HomeScreen(
             val draggedInfo = viewport.visibleItemsInfo.firstOrNull { it.index == currentIndex }
             if (draggedInfo != null) {
                 val itemCenter = draggedInfo.offset + dragDelta + draggedInfo.size / 2f
-                val topEdge = viewport.viewportStartOffset + viewportHeight * 0.12f
-                val bottomEdge = viewport.viewportEndOffset - viewportHeight * 0.12f
+                val threshold = viewportHeight * 0.20f // 20% zone at each edge
+                val topEdge = viewport.viewportStartOffset + threshold
+                val bottomEdge = viewport.viewportEndOffset - threshold
 
-                val speed = when {
-                    itemCenter < topEdge -> -(topEdge - itemCenter).coerceAtMost(20f)
-                    itemCenter > bottomEdge -> (itemCenter - bottomEdge).coerceAtMost(20f)
+                // How deep into the zone (0 = just entered, 1 = at the very edge)
+                val fraction = when {
+                    itemCenter < topEdge -> 1f - (itemCenter - viewport.viewportStartOffset) / threshold
+                    itemCenter > bottomEdge -> 1f - (viewport.viewportEndOffset - itemCenter) / threshold
                     else -> 0f
-                }
-                if (speed != 0f) {
-                    val consumed = listState.dispatchRawDelta(speed)
+                }.coerceIn(0f, 1f)
+
+                if (fraction > 0f) {
+                    // Accelerating curve: deeper into zone = much faster scroll
+                    val maxSpeed = 50f
+                    val speed = fraction * fraction * maxSpeed
+                    val direction = if (itemCenter < topEdge) -1f else 1f
+                    val consumed = listState.dispatchRawDelta(direction * speed)
                     overscroll += consumed
                 }
             }
