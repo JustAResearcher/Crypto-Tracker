@@ -72,22 +72,24 @@ fun HomeScreen(
         }
     }
 
-    // Continuous auto-scroll while dragging near edges
+    // Continuous auto-scroll while dragging near edges.
+    // Key insight: after dispatchRawDelta moves the list, the dragged item's
+    // layout offset shifts but the finger hasn't moved. We must adjust dragDelta
+    // by the consumed scroll so the item stays pinned under the finger.
     LaunchedEffect(isDragging) {
         if (!isDragging) return@LaunchedEffect
         while (isActive && isDragging) {
             val viewport = listState.layoutInfo
             val viewportHeight = (viewport.viewportEndOffset - viewport.viewportStartOffset).toFloat()
-            if (viewportHeight <= 0f) { delay(16); continue }
+            if (viewportHeight <= 0f) { delay(8); continue }
 
             val draggedInfo = viewport.visibleItemsInfo.firstOrNull { it.index == currentIndex }
             if (draggedInfo != null) {
                 val itemCenter = draggedInfo.offset + dragDelta + draggedInfo.size / 2f
-                val threshold = viewportHeight * 0.20f // 20% zone at each edge
+                val threshold = viewportHeight * 0.22f
                 val topEdge = viewport.viewportStartOffset + threshold
                 val bottomEdge = viewport.viewportEndOffset - threshold
 
-                // How deep into the zone (0 = just entered, 1 = at the very edge)
                 val fraction = when {
                     itemCenter < topEdge -> 1f - (itemCenter - viewport.viewportStartOffset) / threshold
                     itemCenter > bottomEdge -> 1f - (viewport.viewportEndOffset - itemCenter) / threshold
@@ -95,15 +97,37 @@ fun HomeScreen(
                 }.coerceIn(0f, 1f)
 
                 if (fraction > 0f) {
-                    // Accelerating curve: deeper into zone = much faster scroll
-                    val maxSpeed = 50f
-                    val speed = fraction * fraction * maxSpeed
+                    // Cubic ramp: feels gentle at the zone edge, very fast at screen edge
+                    val maxSpeed = 80f
+                    val speed = fraction * fraction * fraction * maxSpeed
                     val direction = if (itemCenter < topEdge) -1f else 1f
                     val consumed = listState.dispatchRawDelta(direction * speed)
-                    overscroll += consumed
+
+                    // *** THE FIX: compensate dragDelta so item stays under finger ***
+                    dragDelta += consumed
+
+                    // Run swap check during scroll so items reorder while scrolling
+                    val updatedInfo = listState.layoutInfo.visibleItemsInfo
+                        .firstOrNull { it.index == currentIndex }
+                    if (updatedInfo != null) {
+                        val updatedCenter = updatedInfo.offset + dragDelta + updatedInfo.size / 2f
+                        val swapTarget = listState.layoutInfo.visibleItemsInfo.firstOrNull { info ->
+                            info.index != currentIndex &&
+                                    updatedCenter >= info.offset &&
+                                    updatedCenter <= info.offset + info.size
+                        }
+                        if (swapTarget != null) {
+                            val from = currentIndex
+                            val to = swapTarget.index
+                            val item = localCoins.removeAt(from)
+                            localCoins.add(to, item)
+                            dragDelta += (updatedInfo.offset - swapTarget.offset)
+                            currentIndex = to
+                        }
+                    }
                 }
             }
-            delay(16) // ~60fps
+            delay(8) // ~120 checks/sec for responsiveness
         }
     }
 
