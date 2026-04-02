@@ -55,13 +55,28 @@ class HomeViewModel @Inject constructor(
             _error.value = null
             try {
                 val markets = repository.getMarkets()
-                _rawCoins.value = markets
+                val hasMewc = markets.any { it.id == PINNED_COIN_ID }
+                val merged = if (hasMewc) {
+                    markets
+                } else {
+                    val mewc = try {
+                        repository.getCoinsByIds(listOf(PINNED_COIN_ID))
+                    } catch (_: Exception) {
+                        emptyList()
+                    }
+                    markets + mewc
+                }
+                _rawCoins.value = merged
             } catch (e: Exception) {
                 _error.value = e.message ?: "Failed to load market data"
             } finally {
                 _isLoading.value = false
             }
         }
+    }
+
+    companion object {
+        private const val PINNED_COIN_ID = "meowcoin"
     }
 
     fun toggleFavorite(coinId: String, isFavorite: Boolean) {
