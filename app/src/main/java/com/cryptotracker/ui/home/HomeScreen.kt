@@ -134,7 +134,7 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Crypto Tracker", fontWeight = FontWeight.Bold) },
+                title = { Text("Meowcoin Coin Tracker", fontWeight = FontWeight.Bold) },
                 actions = {
                     IconButton(onClick = { viewModel.loadMarkets() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh")
