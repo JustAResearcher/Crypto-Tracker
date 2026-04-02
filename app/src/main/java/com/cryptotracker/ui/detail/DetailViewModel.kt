@@ -143,7 +143,7 @@ private fun CoinMarketDto.toCoin(): Coin {
         name = name,
         imageUrl = image,
         currentPrice = currentPrice ?: 0.0,
-        marketCap = marketCap ?: 0L,
+        marketCap = marketCap ?: 0.0,
         marketCapRank = marketCapRank ?: 0,
         totalVolume = totalVolume ?: 0.0,
         high24h = high24h ?: 0.0,

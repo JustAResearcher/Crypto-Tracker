@@ -8,7 +8,7 @@ data class CoinMarketDto(
     val name: String,
     val image: String,
     @SerializedName("current_price") val currentPrice: Double?,
-    @SerializedName("market_cap") val marketCap: Long?,
+    @SerializedName("market_cap") val marketCap: Double?,
     @SerializedName("market_cap_rank") val marketCapRank: Int?,
     @SerializedName("total_volume") val totalVolume: Double?,
     @SerializedName("high_24h") val high24h: Double?,

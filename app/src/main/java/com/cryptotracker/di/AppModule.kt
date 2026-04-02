@@ -2,7 +2,6 @@ package com.cryptotracker.di
 
 import android.content.Context
 import androidx.room.Room
-import androidx.work.WorkManager
 import com.cryptotracker.data.local.CryptoDatabase
 import com.cryptotracker.data.remote.CoinGeckoApi
 import dagger.Module
@@ -53,12 +52,8 @@ object AppModule {
             context,
             CryptoDatabase::class.java,
             "crypto_tracker_db"
-        ).build()
-    }
-
-    @Provides
-    @Singleton
-    fun provideWorkManager(@ApplicationContext context: Context): WorkManager {
-        return WorkManager.getInstance(context)
+        )
+            .fallbackToDestructiveMigration()
+            .build()
     }
 }

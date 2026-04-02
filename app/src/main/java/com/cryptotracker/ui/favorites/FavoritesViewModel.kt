@@ -47,7 +47,7 @@ class FavoritesViewModel @Inject constructor(
                         name = dto.name,
                         imageUrl = dto.image,
                         currentPrice = dto.currentPrice ?: 0.0,
-                        marketCap = dto.marketCap ?: 0L,
+                        marketCap = dto.marketCap ?: 0.0,
                         marketCapRank = dto.marketCapRank ?: 0,
                         totalVolume = dto.totalVolume ?: 0.0,
                         high24h = dto.high24h ?: 0.0,
