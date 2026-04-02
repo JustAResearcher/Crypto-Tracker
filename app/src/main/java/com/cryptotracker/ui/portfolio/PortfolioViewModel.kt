@@ -31,7 +31,8 @@ data class PortfolioUiState(
     val totalChange24h: Double = 0.0,
     val isLoading: Boolean = false,
     val error: String? = null,
-    val showAddDialog: Boolean = false
+    val showAddDialog: Boolean = false,
+    val editingHolding: PortfolioHolding? = null
 )
 
 @HiltViewModel
@@ -45,9 +46,10 @@ class PortfolioViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(false)
     private val _error = MutableStateFlow<String?>(null)
     private val _showAddDialog = MutableStateFlow(false)
+    private val _editingHolding = MutableStateFlow<PortfolioHolding?>(null)
 
     val uiState: StateFlow<PortfolioUiState> = combine(
-        _entries, _prices, _isLoading, _error, _showAddDialog
+        _entries, _prices, _isLoading, _error, _showAddDialog, _editingHolding
     ) { values ->
         @Suppress("UNCHECKED_CAST")
         val entries = values[0] as List<PortfolioEntity>
@@ -55,6 +57,7 @@ class PortfolioViewModel @Inject constructor(
         val loading = values[2] as Boolean
         val error = values[3] as String?
         val showDialog = values[4] as Boolean
+        val editing = values[5] as PortfolioHolding?
 
         val priceMap = prices.associateBy { it.id }
         val holdings = entries.map { entry ->
@@ -84,7 +87,8 @@ class PortfolioViewModel @Inject constructor(
             totalChange24h = totalChange,
             isLoading = loading,
             error = error,
-            showAddDialog = showDialog
+            showAddDialog = showDialog,
+            editingHolding = editing
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), PortfolioUiState())
 
@@ -118,6 +122,20 @@ class PortfolioViewModel @Inject constructor(
 
     fun showAddDialog() { _showAddDialog.value = true }
     fun hideAddDialog() { _showAddDialog.value = false }
+
+    fun editHolding(holding: PortfolioHolding) { _editingHolding.value = holding }
+    fun cancelEdit() { _editingHolding.value = null }
+
+    fun updateQuantity(entryId: Int, newQuantity: Double) {
+        viewModelScope.launch {
+            if (newQuantity <= 0) {
+                repository.deletePortfolioEntry(entryId)
+            } else {
+                repository.updatePortfolioQuantity(entryId, newQuantity)
+            }
+            _editingHolding.value = null
+        }
+    }
 
     fun addHolding(coinId: String, coinName: String, quantity: Double) {
         viewModelScope.launch {

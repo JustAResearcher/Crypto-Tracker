@@ -17,4 +17,7 @@ interface PortfolioDao {
 
     @Query("DELETE FROM portfolio WHERE id = :id")
     suspend fun delete(id: Int)
+
+    @Query("UPDATE portfolio SET quantity = :quantity WHERE id = :id")
+    suspend fun updateQuantity(id: Int, quantity: Double)
 }

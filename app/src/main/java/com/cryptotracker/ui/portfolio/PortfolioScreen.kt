@@ -1,5 +1,6 @@
 package com.cryptotracker.ui.portfolio
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +20,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -80,6 +82,18 @@ fun PortfolioScreen(
             onDismiss = { viewModel.hideAddDialog() },
             onConfirm = { coinId, coinName, qty ->
                 viewModel.addHolding(coinId, coinName, qty)
+            }
+        )
+    }
+
+    uiState.editingHolding?.let { holding ->
+        EditHoldingDialog(
+            holding = holding,
+            onDismiss = { viewModel.cancelEdit() },
+            onConfirm = { newQty -> viewModel.updateQuantity(holding.entryId, newQty) },
+            onDelete = {
+                viewModel.deleteHolding(holding.entryId)
+                viewModel.cancelEdit()
             }
         )
     }
@@ -182,6 +196,7 @@ fun PortfolioScreen(
                         holding = holding,
                         currencyFormat = currencyFormat,
                         percentFormat = percentFormat,
+                        onEdit = { viewModel.editHolding(holding) },
                         onDelete = { viewModel.deleteHolding(holding.entryId) }
                     )
                 }
@@ -195,10 +210,13 @@ private fun HoldingItem(
     holding: PortfolioHolding,
     currencyFormat: NumberFormat,
     percentFormat: NumberFormat,
+    onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onEdit() },
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
@@ -247,10 +265,10 @@ private fun HoldingItem(
                 )
             }
 
-            IconButton(onClick = onDelete) {
+            IconButton(onClick = onEdit) {
                 Icon(
-                    Icons.Default.Delete,
-                    contentDescription = "Remove",
+                    Icons.Default.Edit,
+                    contentDescription = "Edit quantity",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -308,6 +326,61 @@ private fun AddHoldingDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+private fun EditHoldingDialog(
+    holding: PortfolioHolding,
+    onDismiss: () -> Unit,
+    onConfirm: (newQuantity: Double) -> Unit,
+    onDelete: () -> Unit
+) {
+    var quantity by remember { mutableStateOf(holding.quantity.toString()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit ${holding.coinName}") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "Current quantity: ${holding.quantity}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedTextField(
+                    value = quantity,
+                    onValueChange = { quantity = it },
+                    label = { Text("New quantity") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    text = "Set to 0 to remove entirely",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val qty = quantity.toDoubleOrNull()
+                    if (qty != null && qty >= 0) {
+                        onConfirm(qty)
+                    }
+                }
+            ) { Text("Save") }
+        },
+        dismissButton = {
+            Row {
+                TextButton(onClick = onDelete) {
+                    Text("Delete", color = PriceRed)
+                }
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
         }
     )
 }

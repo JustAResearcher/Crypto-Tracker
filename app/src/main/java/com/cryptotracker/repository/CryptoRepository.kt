@@ -82,4 +82,7 @@ class CryptoRepository @Inject constructor(
 
     suspend fun deletePortfolioEntry(id: Int) =
         db.portfolioDao().delete(id)
+
+    suspend fun updatePortfolioQuantity(id: Int, quantity: Double) =
+        db.portfolioDao().updateQuantity(id, quantity)
 }
