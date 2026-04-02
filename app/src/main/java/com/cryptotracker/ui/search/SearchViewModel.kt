@@ -3,6 +3,7 @@ package com.cryptotracker.ui.search
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cryptotracker.data.remote.dto.CoinMarketDto
+import com.cryptotracker.data.remote.dto.SparklineDto
 import com.cryptotracker.domain.model.Coin
 import com.cryptotracker.repository.CryptoRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -33,8 +34,9 @@ class SearchViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(false)
     private val _error = MutableStateFlow<String?>(null)
 
-    // Cache of all market coins for instant local filtering
-    private var cachedMarkets: List<CoinMarketDto> = emptyList()
+    // Cache of all market coins for instant local filtering — seeded with
+    // Meowcoin so it's always findable even before the API responds
+    private var cachedMarkets: List<CoinMarketDto> = listOf(MEOWCOIN_FALLBACK)
 
     val uiState: StateFlow<SearchUiState> = combine(
         _query, _results, _isLoading, _error
@@ -50,15 +52,15 @@ class SearchViewModel @Inject constructor(
             try {
                 val markets = repository.getMarkets()
                 val hasMewc = markets.any { it.id == "meowcoin" }
-                cachedMarkets = if (hasMewc) {
-                    markets
-                } else {
+                cachedMarkets = if (hasMewc) markets else {
                     val mewc = try {
                         repository.getCoinsByIds(listOf("meowcoin"))
                     } catch (_: Exception) { emptyList() }
-                    markets + mewc
+                    if (mewc.isNotEmpty()) markets + mewc else markets + MEOWCOIN_FALLBACK
                 }
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+                // Keep the fallback list with Meowcoin
+            }
         }
     }
 
@@ -115,6 +117,25 @@ class SearchViewModel @Inject constructor(
         _query.value = ""
         _results.value = emptyList()
         _error.value = null
+    }
+
+    companion object {
+        private val MEOWCOIN_FALLBACK = CoinMarketDto(
+            id = "meowcoin",
+            symbol = "mewc",
+            name = "Meowcoin",
+            image = "https://coin-images.coingecko.com/coins/images/27679/large/MeowcoinR2.png?1762675566",
+            currentPrice = null,
+            marketCap = null,
+            marketCapRank = null,
+            totalVolume = null,
+            high24h = null,
+            low24h = null,
+            priceChangePercentage24h = null,
+            circulatingSupply = null,
+            ath = null,
+            sparklineIn7d = null
+        )
     }
 }
 
